@@ -1,6 +1,6 @@
 import numpy as np
 import sounddevice as sd
-
+from client.logger import Logger
 class Microphone:
     def __init__(
         self,
@@ -17,6 +17,7 @@ class Microphone:
         self.blocksize = blocksize
         self.running = False
         self.stream = None
+        self.logger = Logger()
 
     def start(self) -> None:
         if not self.running:
@@ -42,7 +43,7 @@ class Microphone:
         try:
             data, overflow = self.stream.read(self.blocksize)
             if overflow:
-                print("Audio overflow")
+                self.logger.log_warning('Audio overflow')
             return data.flatten()
 
         except Exception as e:
@@ -59,9 +60,8 @@ class Microphone:
             self.running = False
             self.stream=None
 
-    #TODO : find the usable microphone
     def find_input_devices(self):
-        print(sd.query_devices(kind='input'))
+        return sd.query_devices(kind='input')
 
     @property
     def is_running(self):
@@ -70,5 +70,7 @@ class Microphone:
     def get_volume(self, frame) -> float:
         return np.sqrt(np.mean(frame.astype(np.float32) ** 2))
 
+    #TODO : finish callback if needed
     def callback(self):
         pass
+
