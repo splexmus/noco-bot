@@ -4,11 +4,11 @@ from client.logger import Logger
 class Microphone:
     def __init__(
         self,
-        samplerate=16000,
-        channels=1,
-        dtype="int16",
-        blocksize=512,
-        device=None
+        samplerate: int = 16000,
+        channels: int = 1,
+        dtype: str = "int16",
+        blocksize: int = 512,
+        device: int | None = None
     ):
         self.samplerate = samplerate
         self.channels = channels
