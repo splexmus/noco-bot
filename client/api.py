@@ -1,4 +1,4 @@
-class STTclient:
+class STTClient:
     def __init__(self):
         pass
 
@@ -10,16 +10,6 @@ class LLMClient:
         pass
 
     def chat(text):
-        pass
-
-class MemoryClient:
-    def __init__(self):
-        pass
-
-    def recall(text):
-        pass
-
-    def remember(text):
         pass
 
 class TTSClient:

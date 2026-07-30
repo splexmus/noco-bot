@@ -55,6 +55,10 @@ dependencies:
       - huggingface-hub==1.25.1
       - idna==3.18
       - numpy==2.4.6
+      - nvidia-cublas-cu12==12.9.2.10
+      - nvidia-cuda-nvrtc-cu12==12.9.86
+      - nvidia-cudnn-cu12==9.24.0.43
+      - ollama==0.6.2
       - onnxruntime==1.28.0
       - protobuf==7.35.1
       - pycparser==3.0

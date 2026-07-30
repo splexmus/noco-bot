@@ -1,0 +1,4 @@
+SERVER_HOST = "localhost"
+SERVER_PORT = 8000
+
+BASE_URL = f"http://{SERVER_HOST}:{SERVER_PORT}"
