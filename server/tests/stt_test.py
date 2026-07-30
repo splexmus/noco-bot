@@ -1,8 +1,8 @@
 import numpy as np
 import soundfile as sf
-from server.stt.whisper_engine import Whisper_engine
+from server.stt.whisper_engine import WhisperEngine
 
-whisper = Whisper_engine()
+whisper = WhisperEngine()
 datas = sf.read('client/sounds/stereo_file.wav')
 
-whisper.transcribe(datas[0])
+print(whisper.transcribe(datas[0]))

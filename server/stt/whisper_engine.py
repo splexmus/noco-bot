@@ -1,7 +1,7 @@
 from faster_whisper import WhisperModel
 import numpy as np
 
-class Whisper_engine:
+class WhisperEngine:
     def __init__(
         self,
         model_size_or_path: str = "large-v2",

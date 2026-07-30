@@ -8,13 +8,15 @@ class APIClient:
     def post(
         self,
         endpoint: str,
-        data,
-        headers=None
+        data = None,
+        json = None,
+        headers = None
     ):
 
         response = requests.post(
             self.base_url + endpoint,
             data=data,
+            json=json,
             headers=headers,
             timeout=300,
         )
