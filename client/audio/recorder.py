@@ -1,5 +1,3 @@
-import soundfile as sf
-from pathlib import Path
 import numpy as np
 from .vad import VoiceActivityDetector
 from collections import deque

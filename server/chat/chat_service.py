@@ -13,26 +13,18 @@ router = APIRouter()
 @router.post("/chat", tags=["chat"])
 async def chat(request: Request):
 
-    # prompt = request.text
+    memories = memory.search(request.text)
 
-    messages = [
-        {
-            "role": "user",
-            "content": request.text,
-        }
-    ]
-    # memories = memory.search(request.text)
+    prompt = memory.build_context(
+        request.text,
+        memories
+    )
 
-    # prompt = memory.build_context(
-    #     request.text,
-    #     memories
-    # )
+    answer = llm.generate(prompt)
 
-    answer = llm.generate(messages)
-
-    # memory.add(request.text)
-    # memory.add(answer)
+    memory.add(request = request.text, answer = answer)
 
     return {
-        "response": answer
+        "response": answer,
+        "prompt": prompt
     } 
