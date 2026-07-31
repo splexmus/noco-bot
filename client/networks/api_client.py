@@ -10,7 +10,8 @@ class APIClient:
         endpoint: str,
         data = None,
         json = None,
-        headers = None
+        headers = None,
+        response_type="json",
     ):
 
         response = requests.post(
@@ -22,5 +23,8 @@ class APIClient:
         )
 
         response.raise_for_status()
+
+        if response_type == "bytes":
+            return response.content
 
         return response.json()

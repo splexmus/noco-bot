@@ -4,7 +4,7 @@ from chromadb.utils.embedding_functions.ollama_embedding_function import (
 import chromadb
 import uuid
 
-class Chromadb:
+class ChromaMemory:
     def __init__(
         self,
         ollama_url: str = "http://localhost:11434",
@@ -15,7 +15,10 @@ class Chromadb:
             url=ollama_url,
             model_name=ollama_model,
         )
-        self.chroma_client = chromadb.Client()
+        self.chroma_client = chromadb.PersistentClient(
+            path="./server/memory/memory_db"
+        )
+
         self.collection = self.chroma_client.get_or_create_collection(
             name="NOCO_memory",
             embedding_function=self.ollama_ef,
@@ -32,20 +35,27 @@ class Chromadb:
             metadatas=[
                 {
                     "type": "conversation",
-                    "speaker": "assistant",
                 }
             ]
         )
 
     def query(
         self,
-        query_texts: str,
-    ):
+        query_text: str,
+    ) -> list[str]:
         if self.collection.count() == 0:
             return []
         
         results = self.collection.query(
-            query_texts=[query_texts],
+            query_texts=[query_text],
             n_results = self.n_result
         )
-        return results
+        return results["documents"][0]
+
+    def clear(self):
+        self.chroma_client.delete_collection("NOCO_memory")
+
+        self.collection = self.chroma_client.get_or_create_collection(
+            name="NOCO_memory",
+            embedding_function=self.ollama_ef,
+        )

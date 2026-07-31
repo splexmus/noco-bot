@@ -1,7 +1,80 @@
-from audio.microphone import Microphone
-from audio.recorder import Recorder
-from audio.player import AudioPlayer
-from audio.vad import VoiceActivityDetector
-from wakeword.detector import WakeWordDetector
+from .audio import VoiceActivityDetector, AudioPlayer, Microphone, Recorder
+from .wakeword import WakeWordDetector
+from .networks import ChatClient, STTClient, TTSClient
+from enum import Enum
 
-from api import STTClient, LLMClient, MemoryClient, TTSClient
+detector = WakeWordDetector(wakeword_name = 'hey_noco')
+mic = Microphone()
+vad = VoiceActivityDetector()
+rec = Recorder(vad)
+player = AudioPlayer()
+stt = STTClient()
+chat = ChatClient()
+tts = TTSClient()
+
+class Status(Enum):
+    WAITING     = 1
+    LISTENING   = 2
+    STT_REQUEST = 3
+    CHAT_REQUEST= 4
+    TTS_REQUEST = 5
+
+state = Status.LISTENING
+
+try:
+    mic.start()
+
+    while True:
+        frame = mic.read()
+
+        match state:
+
+            case Status.WAITING:
+                start = detector.detect(frame)
+
+                if start:
+                    print("\nWake word detected")
+                    rec.reset()
+                    state = Status.LISTENING
+
+            case Status.LISTENING:
+                audio = rec.update(frame)
+
+                if audio is not None:
+                    print("\nSTT...")
+                    state = Status.STT_REQUEST
+
+            case Status.STT_REQUEST:
+                result = stt.transcribe(audio=audio)
+                text = result["text"]
+
+                if text:
+                    print("User:", text)
+                    state = Status.CHAT_REQUEST
+                else:
+                    state = Status.WAITING
+
+            case Status.CHAT_REQUEST:
+                result = chat.chat(text)
+                response = result["response"]
+
+                if response:
+                    print("NOCO:", response)
+                    state = Status.TTS_REQUEST
+                else:
+                    state = Status.WAITING
+
+            case Status.TTS_REQUEST:
+                audio = tts.synthesize(response)
+
+                if audio is not None:
+                    player.play(audio)
+
+                state = Status.WAITING
+
+except KeyboardInterrupt:
+    print("Stopping...")
+
+finally:
+    mic.stop()
+    player.close()

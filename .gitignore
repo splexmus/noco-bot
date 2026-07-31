@@ -2,3 +2,4 @@ __pycache__/
 *.pyc
 client/sounds/*
 server/tts/sounds/*
+server/memory/memory_db/*

@@ -1,5 +1,5 @@
 from collections import deque
-from .chroma_store import Chromadb
+from .chroma_store import ChromaMemory
 
 SYSTEM_PROMPT = """
 Your name is NOCO, a helpful and cheerful robot assistant.
@@ -22,15 +22,16 @@ class MemoryEngine:
     def __init__(
         self,
         max_history: int = 20,
+        n_result: int | None = None,
     ):
         self.history = deque(maxlen=max_history)
-        self.chroma = Chromadb()
+        if n_result: 
+            self.vector_store = ChromaMemory(n_result = n_result)
+        else:
+            self.vector_store = ChromaMemory()
 
-    def search(
-        self,
-        query: str
-    ) -> list:
-        return self.chroma.query(query_texts = query)["documents"][0]
+    def search(self, query: str) -> list[str]:
+        return self.vector_store.query(query)
 
     def add(
         self,
@@ -52,12 +53,19 @@ class MemoryEngine:
         Assistant: {answer}
         """
 
-        self.chroma.add(conversation)
+        self.vector_store.add(conversation)
 
-    def clear(self) -> None:
+    def clear_history(self) -> None:
         self.history.clear()
 
-    def build_context(
+    def clear_memory(self) -> None:
+        self.vector_store.clear()
+
+    def reset(self)-> None:
+        self.clear_history()
+        self.clear_memory()
+
+    def build_prompt(
         self,
         request: str,
         memories: str | None = None,

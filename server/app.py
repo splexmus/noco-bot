@@ -6,6 +6,7 @@ from .tts import tts_service
 app = FastAPI()
 app.include_router(stt_service.router)
 app.include_router(chat_service.router)
+app.include_router(tts_service.router)
 
 @app.get("/")
 async def root():

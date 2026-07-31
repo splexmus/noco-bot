@@ -10,7 +10,7 @@ class Recorder:
         max_frames: int  = 256, #estimate 10 secend
         max_silence_frames: int = 30,
         preroll_frames: int = 10,
-        min_speech_frames: int = 5,
+        min_speech_frames: int = 50,
         frame_size: int = 512
     ):
         self.frames = []
