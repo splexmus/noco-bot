@@ -12,7 +12,7 @@ try:
         frame = mic.read()
         audio = rec.update(frame)
         if audio is not None:
-            sf.write('client/stereo_file.wav', audio, 16000)            
+            sf.write('client/sounds/stereo_file.wav', audio, 16000)            
         print(rec.is_recording, rec.duration)
         print('-'*50)
 except KeyboardInterrupt:

@@ -26,7 +26,7 @@ async def post_stt(request: Request):
     buffer = io.BytesIO(body)
     arr = np.load(buffer)
 
-    segments, info = whisper.transcribe(arr)
+    segments, info = whisper.transcribe(data = arr, language = "th")
 
     result = []
 

@@ -19,7 +19,8 @@ class Status(Enum):
     CHAT_REQUEST= 4
     TTS_REQUEST = 5
 
-state = Status.LISTENING
+state = Status.WAITING
+prestart = False
 
 try:
     mic.start()
@@ -32,10 +33,12 @@ try:
             case Status.WAITING:
                 start = detector.detect(frame)
 
-                if start:
+                if not start and prestart:
                     print("\nWake word detected")
                     rec.reset()
                     state = Status.LISTENING
+
+                prestart = start
 
             case Status.LISTENING:
                 audio = rec.update(frame)
@@ -69,6 +72,7 @@ try:
 
                 if audio is not None:
                     player.play(audio)
+                    player.close()
 
                 state = Status.WAITING
 

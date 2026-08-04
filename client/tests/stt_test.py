@@ -1,7 +1,23 @@
 from client.networks import STTClient
-import soundfile as sf
+from client.audio import Microphone, VoiceActivityDetector, Recorder
 
+mic = Microphone()
+vad = VoiceActivityDetector()
+rec = Recorder(vad)
 stt = STTClient()
 
-audio = sf.read('client/sounds/stereo_file.wav')
-print(stt.transcribe(audio = audio[0]))
+mic.start()
+
+try:
+    while True:
+        frame = mic.read()
+        audio = rec.update(frame)
+        if audio is not None:
+            print("STT.. :")
+            print(stt.transcribe(audio = audio))
+        # print(rec.is_recording, rec.duration)
+        # print('-'*50)
+except KeyboardInterrupt:
+    pass
+finally:
+    mic.stop()

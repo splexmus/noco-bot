@@ -25,7 +25,7 @@ async def chat(request: ChatRequest):
 
     answer = llm.generate(prompt)
 
-    memory.add(request = text, answer = answer)
+    # memory.add(request = text, answer = answer)
 
     return {
         "response": answer,
