@@ -2,5 +2,6 @@ from server.llm.ollama_engine import OllamaEngine
 
 llm = OllamaEngine()
 
-mesg = "Hi, what are you?"
-print(llm.generate(mesg))
+mesg = [{'role': 'user', 'content': 'what is ai raising?'}]
+# print(llm.generate(mesg))
+print(llm.test())
