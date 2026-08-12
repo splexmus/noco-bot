@@ -48,13 +48,24 @@ try:
                     state = Status.STT_REQUEST
 
             case Status.STT_REQUEST:
-                result = stt.transcribe(audio=audio)
-                text = result["text"]
+
+                try:
+                    result = stt.transcribe(audio=audio)
+                    text = result["text"]
+                except Exception as e:
+                    print(f"\nSTT error: {e}")
+                    rec.reset()
+                    print("Returning to WAITING")
+                    state = Status.WAITING
+                    continue
 
                 if text:
                     print("User:", text)
                     state = Status.CHAT_REQUEST
                 else:
+                    print(f"\nSTT error: {e}")
+                    rec.reset()
+                    print("Returning to WAITING")
                     state = Status.WAITING
 
             case Status.CHAT_REQUEST:

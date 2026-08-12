@@ -41,18 +41,26 @@ class AudioPlayer:
                                 blocksize=self.blocksize,
                                 device=self.device,
                                 dtype=self.dtype,
-                                # callback=self._callback
+                                callback=self._callback
                             )
                     self.stream.start()
                 audio = self._prepare_audio(audio)
-                # self.q.put(audio)
+                for start in range(0, len(audio), self.blocksize):
+                    chunk = audio[start:start + self.blocksize]
+                    if len(chunk) < self.blocksize:
+                        chunk = np.pad(
+                            chunk,
+                            (0, self.blocksize - len(chunk))
+                        )
+                    chunk = chunk.reshape(-1, self.channels)
+                    self.q.put(chunk, timeout=1.0)
                 self.playing = True
-                self.stream.write(audio)
+                # self.stream.write(audio)
 
             except Exception as e:
                 raise RuntimeError(f"Audio playback failed: {e}") from e
             finally:
-                self.stop()
+                self.playing = False
 
     def close(self) -> None:
         if self.stream is not None:
@@ -60,10 +68,11 @@ class AudioPlayer:
             self.stream.close()
             self.stream = None
         self.playing = False
+        self._clear_queue()
 
     def stop(self) -> None:
-        if self.stream is not None:
-            self.stream.stop()
+        # if self.stream is not None:
+        #     self.stream.stop()
         self.playing = False
 
     @property
@@ -86,15 +95,24 @@ class AudioPlayer:
             raise sd.CallbackAbort
         if status:
             print(status)
+
         try:
             data = self.q.get_nowait()
         except queue.Empty as e:
-            print('Buffer is empty: increase buffersize?', file=sys.stderr)
-            raise sd.CallbackAbort from e
+            # print('Buffer is empty: increase buffersize?', file=sys.stderr)
+            # raise sd.CallbackAbort from e
+            outdata[:].fill(0)
+            return
         if len(data) < len(outdata):
             outdata[:len(data)] = data
             outdata[len(data):].fill(0)
-            raise sd.CallbackStop
+            # raise sd.CallbackStop
         else:
             outdata[:] = data
-        
+
+    def _clear_queue(self):
+        while not self.q.empty():
+            try:
+                self.q.get_nowait()
+            except queue.Empty:
+                break
