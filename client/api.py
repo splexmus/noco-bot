@@ -1,13 +1,9 @@
-from fastapi import FastAPI
-from .api.image import image_service
+"""Compatibility entry point for the robot-side image API.
 
-app = FastAPI()
-app.include_router(image_service.router)
+The importable application lives in the ``client.api`` package. Run it with:
+``uvicorn client.api:app --host 0.0.0.0 --port 8001``.
+"""
 
-@app.get("/")
-async def root():
-    return {"message": "Hello Bigger Applications!"}
+from client.api import app
 
-@app.get("/health")
-async def health():
-    return {"status": "ok"}
+__all__ = ["app"]

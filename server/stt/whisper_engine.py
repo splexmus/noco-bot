@@ -16,7 +16,14 @@ class WhisperEngine:
         language: str | None = None
     ):
         try:
-            segments, info = self.model.transcribe(audio = data, vad_filter = False, language = language, chunk_length = 5)
+            segments, info = self.model.transcribe(
+                audio=data,
+                beam_size=5,
+                language=None,
+                vad_filter=False,
+                initial_prompt="NOCO is a robot assistant. The user may speak English or Thai.",
+                condition_on_previous_text=False,
+            )
             return [segments, info]
         
         except KeyboardInterrupt:
