@@ -13,7 +13,8 @@ Keep these two HTTP applications and their traffic directions distinct:
 ```text
 Robot / edge device                         Central compute server
 -------------------                         ----------------------
-client.app (voice state machine)
+client.display (face on main thread)
+    |-- client.app (voice worker/state machine)
     POST audio/text ----------------------> server.app
                                              /stt
                                              /chat
@@ -24,7 +25,8 @@ robot image receiver <-------------------- central image sender
 ```
 
 - `server.app:app` is the central FastAPI app. It owns `/stt`, `/chat`, `/tts`, `/health`, and `/`.
-- `client.app` is the long-running robot voice state machine and an HTTP client of `server.app`.
+- `client.app` exposes the reusable `VoiceAssistant` state machine and remains the headless entry point.
+- `client.display` is the preferred screen-equipped robot entry point. Tkinter stays on the main thread while `VoiceAssistant` runs in one worker thread and reports changes through its callback.
 - The robot-side image API is intended to accept inbound `POST /image` calls from the central server. It is a separate process from `client.app` even when both run on the same robot.
 - Bind the robot image receiver to `0.0.0.0` when another machine must reach it. Configure the sender with the robot's LAN address; `localhost` only works when sender and receiver are on the same machine.
 - Use a different port for the robot image receiver (for example `8001`) and the central API (`8000`). Do not overload `client.config.BASE_URL`: that value identifies the central server from the robot's point of view.
@@ -33,6 +35,8 @@ robot image receiver <-------------------- central image sender
 
 The voice path exists, though it remains prototype-quality. The robot-side image receiver is implemented in the `client.api` package:
 
+- Run the screen-equipped voice client with `python -m client.display`; use `--demo --windowed` to preview expressions without hardware.
+- The face supports waiting, listening, thinking, speaking, and error expressions.
 - Run it with `uvicorn client.api:app --host 0.0.0.0 --port 8001`.
 - `POST /image` validates JPEG bytes and atomically stores them as `client/api/image/img.jpg`.
 - `GET /image` returns the current JPEG, and `GET /health` checks receiver availability.
@@ -59,7 +63,8 @@ If the required behavior is instead robot-to-central image upload, confirm that 
 
 ## Code map
 
-- `client/app.py`: synchronous voice-assistant state machine: waiting, listening, STT, chat, TTS.
+- `client/app.py`: reusable voice-assistant state machine and headless entry point.
+- `client/display/`: Tkinter face renderer and screen/voice composition root.
 - `client/audio/`: microphone capture, Silero VAD, recording, and playback.
 - `client/wakeword/`: OpenWakeWord wrapper using models in `client/models/`.
 - `client/networks/`: blocking `requests` clients for the central API.
@@ -90,7 +95,7 @@ conda env create -f environments/stt.yml
 conda activate stt
 uvicorn server.app:app --host 0.0.0.0 --port 8000
 conda activate robot
-python -m client.app
+python -m client.display
 ```
 
 The environment exports include machine-specific `prefix:` values. Remove or override those when recreating environments on another host. `server/requirements.txt` and `docker/requirements.txt` are currently empty, and the Dockerfile is not a reliable setup path.
@@ -100,7 +105,7 @@ Before handing off changes:
 1. Compile changed Python modules with `python -m compileall client server`.
 2. Exercise `/health` for every FastAPI process that was changed.
 3. Test HTTP contracts through both sender and receiver; do not test only route internals.
-4. For image work, cover a valid JPEG or PNG, an empty body, an unsupported content type, malformed bytes, and the configured size limit.
+4. For image work, cover a valid JPEG, an empty body, an unsupported content type, malformed bytes, and the configured size limit.
 5. State which checks require unavailable hardware, local models, Ollama, or audio devices.
 
 ## Known review findings
@@ -108,7 +113,6 @@ Before handing off changes:
 Account for these when working near the affected code:
 
 - `client/networks/tts_client.py` reads the response as raw `int16`, but `server/tts/tts_service.py` wraps audio with `numpy.save`. The `.npy` header will be interpreted as samples. Fix both sides together or load the response with `numpy.load`.
-- In `client/app.py`, the empty-STT-result branch references `e` when no exception is active.
 - Service engines are constructed at module import time. Starting `server.app` immediately loads Whisper, Piper, Chroma, and Ollama-related resources; tests and lightweight health checks are therefore expensive and environment-dependent.
 - `server/memory/chroma_store.py` uses a working-directory-relative database path and assumes a local Ollama embedding service at port `11434`.
 - `server/llm/__inti__.py` is misspelled.
@@ -126,3 +130,6 @@ Account for these when working near the affected code:
 - Use `pathlib.Path` anchored to the module/repository location instead of relying on the current working directory for new file paths.
 - Add focused automated tests for new logic. Keep hardware, model-download, and live-Ollama checks clearly marked as integration/manual tests.
 - Never deserialize untrusted image requests with pickle-enabled NumPy loading. Validate byte length and image structure before use.
+- Keep all Tkinter widget creation and drawing on the main thread. Send voice-worker updates through `RobotFaceDisplay.set_state`, which owns the thread-safe queue.
+- Keep visual constants in `FaceTheme` and state geometry in `EXPRESSIONS` so the face remains easy to customize.
+- Preserve `python -m client.display --demo --windowed` as a hardware-free visual preview.
