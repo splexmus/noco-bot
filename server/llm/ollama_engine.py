@@ -3,7 +3,7 @@ from ollama import chat, ChatResponse
 class OllamaEngine:
     def __init__(
         self,
-        model: str = "gemma4:e4b",
+        model: str = "qwen3:0.6b",
     ):
         self.model = model
 
