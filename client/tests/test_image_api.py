@@ -6,10 +6,20 @@ from fastapi import HTTPException
 from starlette.requests import Request
 
 from client.api.image import image_service
-from client.api.image.image_engine import ImageEngine
+from client.api.image.image_engine import ImageEngine, ImageInfo
 
 
 JPEG_BYTES = b"\xff\xd8\xff\xe0NOCO test image\xff\xd9"
+
+
+class FakeCameraEngine:
+    def capture(self):
+        return JPEG_BYTES, ImageInfo(
+            filename="img.jpg",
+            content_type="image/jpeg",
+            size_bytes=len(JPEG_BYTES),
+            sha256="test-sha",
+        )
 
 
 def make_request(body: bytes, content_type: str = "image/jpeg") -> Request:
@@ -42,13 +52,16 @@ class ImageApiTest(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.temporary_directory = tempfile.TemporaryDirectory()
         self.original_engine = image_service.image_engine
+        self.original_camera_engine = image_service.camera_engine
         image_service.image_engine = ImageEngine(
             Path(self.temporary_directory.name) / "img.jpg",
             max_size_bytes=64,
         )
+        image_service.camera_engine = FakeCameraEngine()
 
     def tearDown(self):
         image_service.image_engine = self.original_engine
+        image_service.camera_engine = self.original_camera_engine
         self.temporary_directory.cleanup()
 
     async def test_receive_and_read_image(self):
@@ -63,6 +76,13 @@ class ImageApiTest(unittest.IsolatedAsyncioTestCase):
         file_response = await image_service.get_image()
         self.assertEqual(Path(file_response.path).read_bytes(), JPEG_BYTES)
         self.assertEqual(file_response.media_type, "image/jpeg")
+
+    async def test_capture_camera_returns_jpeg(self):
+        response = image_service.capture_camera_image()
+
+        self.assertEqual(response.body, JPEG_BYTES)
+        self.assertEqual(response.media_type, "image/jpeg")
+        self.assertEqual(response.headers["x-image-sha256"], "test-sha")
 
     async def test_rejects_non_jpeg_content_type(self):
         with self.assertRaises(HTTPException) as context:

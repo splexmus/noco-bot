@@ -1,11 +1,13 @@
 from fastapi import APIRouter, HTTPException, Request, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 
+from .camera_engine import CameraCaptureEngine, CameraCaptureError
 from .image_engine import ImageEngine, InvalidImageError
 
 router = APIRouter()
 image_engine = ImageEngine()
+camera_engine = CameraCaptureEngine(image_engine=image_engine)
 
 
 class ImageResponse(BaseModel):
@@ -14,6 +16,27 @@ class ImageResponse(BaseModel):
     content_type: str
     size_bytes: int
     sha256: str
+
+
+@router.post("/camera/capture", tags=["image"], response_class=Response)
+def capture_camera_image() -> Response:
+    """Capture one frame from the robot camera and return it as JPEG."""
+    try:
+        content, info = camera_engine.capture()
+    except CameraCaptureError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        ) from exc
+
+    return Response(
+        content=content,
+        media_type=info.content_type,
+        headers={
+            "X-Image-SHA256": info.sha256,
+            "X-Image-Size": str(info.size_bytes),
+        },
+    )
 
 
 @router.get("/image", tags=["image"])
