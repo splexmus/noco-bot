@@ -10,6 +10,10 @@ SERVER_DIR = Path(__file__).resolve().parent
 
 @dataclass(frozen=True)
 class Settings:
+    stt_model_id: str = os.getenv("STT_MODEL_ID", "openai/whisper-small")
+    stt_language: str = os.getenv("STT_LANGUAGE", "th")
+    stt_device: str = os.getenv("STT_DEVICE", "auto")
+    stt_chunk_length_seconds: int = int(os.getenv("STT_CHUNK_LENGTH_SECONDS", "30"))
     ollama_host: str = os.getenv("OLLAMA_HOST", "http://localhost:11434")
     chat_model: str = os.getenv("OLLAMA_CHAT_MODEL", "qwen3:0.6b")
     vision_model: str = os.getenv("OLLAMA_VISION_MODEL", "gemma3:4b")

@@ -1,0 +1,17 @@
+name: noco-stt-finetune
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip
+  - libsndfile
+  - pip:
+      - accelerate
+      - datasets
+      - evaluate
+      - jiwer
+      - numpy
+      - scipy
+      - soundfile
+      - torch
+      - transformers

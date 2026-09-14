@@ -1,13 +1,24 @@
-from fastapi import APIRouter, Request
-from .whisper_engine import WhisperEngine
-import numpy as np
+from __future__ import annotations
+
 import io
+from functools import lru_cache
+from typing import Annotated
+
+import numpy as np
+from fastapi import APIRouter, Body, Depends, HTTPException, status
 from pydantic import BaseModel
+
+from .whisper_engine import WhisperEngine
+
+
+MAX_AUDIO_BYTES = 32 * 1024 * 1024
+
 
 class Segment(BaseModel):
     start: float
     end: float
     text: str
+
 
 class STTResponse(BaseModel):
     text: str
@@ -15,31 +26,50 @@ class STTResponse(BaseModel):
     language_probability: float
     segments: list[Segment]
 
-whisper = WhisperEngine()
+
 router = APIRouter()
 
+
+@lru_cache(maxsize=1)
+def get_whisper() -> WhisperEngine:
+    """Load the Hugging Face model on the first STT request."""
+    return WhisperEngine()
+
+
 @router.post("/stt", tags=["stt"], response_model=STTResponse)
-async def post_stt(request: Request):
-    body = await request.body()
-    
-    # 2. Wrap bytes in a memory buffer and load with NumPy
-    buffer = io.BytesIO(body)
-    arr = np.load(buffer)
+def post_stt(
+    body: Annotated[bytes, Body(media_type="application/octet-stream")],
+    whisper: WhisperEngine = Depends(get_whisper),
+) -> STTResponse:
+    if not body:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Audio payload must not be empty",
+        )
+    if len(body) > MAX_AUDIO_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="Audio payload is too large",
+        )
 
-    segments, info = whisper.transcribe(data = arr, language = "th")
+    try:
+        audio = np.load(io.BytesIO(body), allow_pickle=False)
+        if not isinstance(audio, np.ndarray):
+            raise ValueError("Payload did not contain a NumPy array")
+        segments, info = whisper.transcribe(audio)
+    except (ValueError, OSError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=f"Invalid audio payload: {exc}",
+        ) from exc
 
-    result = []
-
-    for segment in segments:
-        result.append({
-            "start": segment.start,
-            "end": segment.end,
-            "text": segment.text,
-        })
-
-    return {
-        "text": " ".join(s["text"] for s in result),
-        "segments": result,
-        "language": info.language,
-        "language_probability": info.language_probability,
-    }
+    response_segments = [
+        Segment(start=segment.start, end=segment.end, text=segment.text)
+        for segment in segments
+    ]
+    return STTResponse(
+        text=" ".join(segment.text for segment in response_segments).strip(),
+        segments=response_segments,
+        language=info.language,
+        language_probability=info.language_probability,
+    )

@@ -10,7 +10,7 @@ The robot also exposes a small FastAPI image service. The server can request a f
 Robot / edge device                         Central compute server
 -------------------                         ----------------------
 Microphone -> Wake word -> VAD/Recorder
-                    POST /stt ------------> Whisper
+                    POST /stt ------------> Hugging Face Whisper
                     POST /chat -----------> Ollama + Chroma
 Speaker <----------- POST /tts ------------ Piper
     |
@@ -46,7 +46,7 @@ client/
       img.jpg               Current robot image (provided at runtime)
 server/
   app.py                    Central FastAPI application
-  stt/                      Faster Whisper transcription
+  stt/                      Hugging Face Transformers Whisper inference
   chat/ and llm/            Chat route and Ollama integration
   memory/                   Chroma vector memory
   tools/                    Robot camera client used by Ollama
@@ -83,6 +83,10 @@ Override runtime settings with environment variables:
 | `OLLAMA_EMBEDDING_MODEL` | `nomic-embed-text` | Chroma embedding model |
 | `ROBOT_API_URL` | `http://localhost:8001` | Robot image API URL |
 | `MEMORY_DB_PATH` | `server/memory/memory_db` | Persistent Chroma directory |
+| `STT_MODEL_ID` | `openai/whisper-small` | Hugging Face model or local checkpoint |
+| `STT_LANGUAGE` | `th` | Forced Whisper transcription language |
+| `STT_DEVICE` | `auto` | `auto`, `cpu`, `cuda`, or `cuda:N` |
+| `STT_CHUNK_LENGTH_SECONDS` | `30` | Inference pipeline chunk length |
 
 Robot camera capture requires `ffmpeg` and a V4L2 camera device. Defaults are `/dev/video0` at 640x480. Configure it with `CAMERA_DEVICE`, `CAMERA_WIDTH`, `CAMERA_HEIGHT`, and `CAMERA_CAPTURE_TIMEOUT_SECONDS` on the robot.
 
@@ -101,6 +105,8 @@ Available routes:
 - `POST /stt`
 - `POST /chat`
 - `POST /tts`
+
+The Hugging Face Whisper model is loaded lazily on the first `/stt` request. Its first use may download the configured checkpoint from the Hub. With a forced `STT_LANGUAGE`, `language_probability` is `1.0` to indicate configuration rather than measured detection confidence; automatic mode reports `unknown` and `0.0`.
 
 ## Run the robot
 
@@ -213,6 +219,23 @@ Camera, network, and model errors are returned to the chat model so it can expla
 
 Successful `/chat` responses are kept in a bounded in-process history and persisted to Chroma. Relevant prior conversations are retrieved before generation and are clearly marked as contextual data rather than instructions. If embedding search or persistence is temporarily unavailable, chat continues without vector memory.
 
+## Fine-tune Whisper
+
+The training workflow in `training/stt/` consumes train and validation JSONL manifests containing `audio` and `text`. It converts audio to mono 16 kHz, fine-tunes `WhisperForConditionalGeneration`, evaluates word error rate (WER), and saves both the model and processor.
+
+```bash
+conda env create -f environments/stt-finetune.yml
+conda activate noco-stt-finetune
+python -m training.stt.finetune \
+  --train-manifest data/train.jsonl \
+  --eval-manifest data/validation.jsonl \
+  --output-dir artifacts/whisper-noco \
+  --language th \
+  --max-steps 10
+```
+
+Start with this short smoke run before a full GPU job. See `training/stt/README.md` for the manifest format, precision options, checkpoint resume, and deployment instructions.
+
 ## API payloads
 
 - `/stt` accepts an `.npy` byte stream created with `numpy.save` and returns transcription JSON.
@@ -230,6 +253,9 @@ python -m compileall client server
 python -m unittest client.tests.test_display -v
 python -m unittest client.tests.test_camera_capture -v
 conda run -n stt python -m unittest \
+  server.tests.test_hf_whisper \
+  server.tests.test_stt_service -v
+conda run -n stt python -m unittest \
   server.tests.test_memory_engine \
   server.tests.test_chroma_store \
   server.tests.test_camera_tool \
@@ -242,7 +268,7 @@ Files under `client/tests/` and `server/tests/` are primarily manual integration
 ## Current limitations
 
 - `server/requirements.txt` and `docker/requirements.txt` are empty; use the Conda environments for now.
-- Importing the STT and TTS routes still initializes heavyweight model services immediately; chat and memory now initialize lazily.
+- TTS still initializes its model at import time; Hugging Face STT, chat, and memory now initialize lazily.
 - The existing TTS server serializes with `numpy.save`, while the client currently reads raw `int16`; this wire-format mismatch still needs correction.
 - Camera capture currently supports V4L2 devices through `ffmpeg`; Raspberry Pi CSI cameras may require a different adapter or V4L2 compatibility mode.
 

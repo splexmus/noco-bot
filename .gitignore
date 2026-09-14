@@ -3,3 +3,7 @@ __pycache__/
 client/sounds/*
 server/tts/sounds/*
 server/memory/memory_db/*
+artifacts/
+data/
+runs/
+wandb/

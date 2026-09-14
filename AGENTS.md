@@ -16,7 +16,7 @@ Robot / edge device                         Central compute server
 client.display (face on main thread)
     |-- client.app (voice worker/state machine)
     POST audio/text ----------------------> server.app
-                                             /stt
+                                             /stt (Hugging Face Whisper)
                                              /chat
     <------------------------- audio         /tts
 
@@ -74,7 +74,8 @@ Unless a task specifies a different protocol, implement the smallest interoperab
 - `client/api/`: robot-side image receiver and JPEG storage engine.
 - `client/api/image/camera_engine.py`: configurable ffmpeg/V4L2 capture adapter.
 - `server/app.py`: central FastAPI composition root.
-- `server/stt/`: Faster Whisper engine and `/stt` route.
+- `server/stt/`: Hugging Face Transformers Whisper engine and `/stt` route.
+- `training/stt/`: manifest-based Whisper fine-tuning workflow and data contract.
 - `server/chat/`, `server/llm/`, `server/memory/`: Ollama chat plus Chroma/Ollama-backed memory lookup.
 - `server/tools/`: robot camera HTTP client used by the Ollama tool loop.
 - `server/tts/`: Piper synthesis and `/tts` route.
@@ -86,6 +87,8 @@ Unless a task specifies a different protocol, implement the smallest interoperab
 - `POST /stt`: body is an `.npy` payload created with `numpy.save`; response is JSON with `text`, language metadata, and timestamped segments.
 - `POST /chat`: JSON `{ "text": "..." }`; response is JSON `{ "response": "..." }`.
 - `POST /tts`: JSON `{ "text": "..." }`; intended response is synthesized PCM audio.
+
+STT defaults to `openai/whisper-small`, Thai transcription, and automatic CPU/CUDA selection. Configure it through the `STT_*` variables in `server/config.py`. Model initialization must remain lazy so `/health` does not download a Hugging Face checkpoint.
 
 Do not silently change an existing endpoint's wire format. Update both producer and consumer together and add a round-trip test.
 
@@ -117,7 +120,7 @@ Before handing off changes:
 Account for these when working near the affected code:
 
 - `client/networks/tts_client.py` reads the response as raw `int16`, but `server/tts/tts_service.py` wraps audio with `numpy.save`. The `.npy` header will be interpreted as samples. Fix both sides together or load the response with `numpy.load`.
-- STT and TTS engines are constructed at module import time. Starting `server.app` immediately loads Whisper and Piper; tests and lightweight health checks are therefore expensive and environment-dependent.
+- TTS is still constructed at module import time. Hugging Face STT initializes lazily on the first request; live inference requires the checkpoint cache or Hub access.
 - Chroma uses a module-anchored persistent path by default and assumes a local Ollama embedding service at port `11434`; both are configurable in `server/config.py`.
 - `server/llm/__inti__.py` is misspelled.
 - Most files under `client/tests/` and `server/tests/` are interactive scripts with hardware/model dependencies and few or no assertions. Do not assume `pytest` provides a clean unit-test signal.
@@ -137,3 +140,6 @@ Account for these when working near the affected code:
 - Keep all Tkinter widget creation and drawing on the main thread. Send voice-worker updates through `RobotFaceDisplay.set_state`, which owns the thread-safe queue.
 - Keep visual constants in `FaceTheme` and state geometry in `EXPRESSIONS` so the face remains easy to customize.
 - Preserve `python -m client.display --demo --windowed` as a hardware-free visual preview.
+- Preserve the `/stt` NumPy request and JSON response contract when changing models.
+- Keep inference dependencies in `environments/stt.yml` and training-only dependencies in `environments/stt-finetune.yml`.
+- Fine-tuning manifests must keep speakers disjoint across train/validation data. Never commit private recordings, checkpoints, or Hugging Face tokens.
